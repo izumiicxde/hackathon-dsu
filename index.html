@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KrishiRakshak - Smart Pest Detector</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; background: #f5f5f5; }
+    h1 { color: #2e7d32; }
+    #result { font-size: 1.2em; margin-top: 10px; }
+    img { width: 250px; border-radius: 10px; margin-top: 10px; }
+    .container { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: inline-block; }
+  </style>
+</head>
+<body>
+  <h1>🌾 KrishiRakshak - AI Crop Disease Detector</h1>
+  <div class="container">
+    <input type="file" id="file-input" accept="image/*"><br>
+    <img id="preview" />
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const LABELS = [
+      "Cashew_Healthy", "Cashew_Diseased",
+      "Cassava_Healthy", "Cassava_Diseased",
+      "Maize_Healthy", "Maize_Diseased",
+      "Tomato_Healthy", "Tomato_Diseased"
+    ];
+
+    let model;
+    async function loadModel() {
+      model = await tf.loadLayersModel('model/model.json');
+      console.log("Model loaded!");
+    }
+    loadModel();
+
+    document.getElementById('file-input').addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const img = document.getElementById('preview');
+      img.src = URL.createObjectURL(file);
+
+      const image = tf.browser.fromPixels(img).resizeNearestNeighbor([224, 224]).toFloat().expandDims();
+      const prediction = await model.predict(image).data();
+      const maxIdx = prediction.indexOf(Math.max(...prediction));
+      const result = LABELS[maxIdx];
+
+      document.getElementById('result').innerHTML = `<b>Detected:</b> ${result.replace('_', ' ')}`;
+
+      const advice = {
+        "Cashew_Diseased": "Spray neem oil and remove infected leaves.",
+        "Cassava_Diseased": "Use compost and avoid overwatering.",
+        "Maize_Diseased": "Rotate crops and use Trichoderma-based compost.",
+        "Tomato_Diseased": "Use cow dung slurry and neem extract weekly."
+      };
+      const remedy = advice[result] || "Looks healthy! Keep soil moist and balanced.";
+      document.getElementById('result').innerHTML += `<br><b>Advice:</b> ${remedy}`;
+    });
+  </script>
+</body>
+</html>
