@@ -72,10 +72,7 @@ export default function App() {
     if (!scrollRef.current) return;
     const t = setTimeout(() => {
       try {
-        scrollRef.current.scrollTo({
-          top: scrollRef.current.scrollHeight,
-          behavior: "smooth",
-        });
+        scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
       } catch {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }
@@ -84,20 +81,11 @@ export default function App() {
   }, [messages]);
 
   const pushUserMessage = (text, imgs = []) =>
-    setMessages((m) => [
-      ...m,
-      { id: Date.now() + Math.random(), type: "user", text, imgs },
-    ]);
+    setMessages((m) => [...m, { id: Date.now() + Math.random(), type: "user", text, imgs }]);
   const pushBotMessage = (text) =>
-    setMessages((m) => [
-      ...m,
-      { id: Date.now() + Math.random(), type: "bot", text },
-    ]);
+    setMessages((m) => [...m, { id: Date.now() + Math.random(), type: "bot", text }]);
   const pushBotTyping = () =>
-    setMessages((m) => [
-      ...m,
-      { id: "typing-" + Date.now(), type: "botTyping" },
-    ]);
+    setMessages((m) => [...m, { id: "typing-" + Date.now(), type: "botTyping" }]);
   const removeBotTyping = () =>
     setMessages((m) => m.filter((x) => x.type !== "botTyping"));
 
@@ -152,8 +140,7 @@ export default function App() {
     Cassava_Diseased: "Use compost and avoid overwatering.",
     Maize_Diseased: "Rotate crops and use Trichoderma-based compost.",
     Tomato_Diseased: "Use cow dung slurry and neem extract weekly.",
-    Unknown:
-      "Valid leaf detected or uncertain — retake photo from multiple angles.",
+    Unknown: "Valid leaf detected or uncertain — retake photo from multiple angles.",
   };
 
   // Get More Info action -> open modal instead of pushing bot message
@@ -236,22 +223,9 @@ export default function App() {
           payload,
         },
       ]);
-
-      // revoke the processing URL AFTER a small delay so the bot card can show the image
-      // (we will keep it for some time; in production upload image and use a real URL)
-      setTimeout(() => {
-        // revoke only if the preview isn't part of a user message (we used fresh URL)
-        // safe to revoke; but bot card already references it — to be safe, we won't revoke here.
-        // If needed, implement uploading and use returned URLs. We'll skip revoke to keep bot card image.
-        // URL.revokeObjectURL(processingUrl);
-      }, 5000);
     }
 
-    // remove typing and show completion
     removeBotTyping();
-    pushBotMessage(
-      "Analysis complete. Tap 'Send to AI SDK' on any card to forward structured output."
-    );
     setPredicting(false);
   };
 
@@ -270,12 +244,7 @@ export default function App() {
           {msg.imgs && msg.imgs.length > 0 && (
             <div className="flex gap-2 mt-3">
               {msg.imgs.map((u, i) => (
-                <img
-                  key={i}
-                  src={u}
-                  alt={`sent-${i}`}
-                  className="w-16 h-16 rounded-md object-cover border"
-                />
+                <img key={i} src={u} alt={`sent-${i}`} className="w-16 h-16 rounded-md object-cover border" />
               ))}
             </div>
           )}
@@ -328,47 +297,39 @@ export default function App() {
           exit={{ opacity: 0, x: -8 }}
           className="self-start bg-[#0f1112] p-3 rounded-xl shadow-md border border-gray-800 max-w-[92%]"
         >
-          <div className="flex gap-3">
-            <img
-              src={p.preview}
-              alt={p.filename}
-              className="w-28 h-28 rounded-md object-cover border"
-            />
-            <div className="flex-1">
+          <div
+            // clicking the card (outside the button) opens modal for ease on touch devices
+            onClick={() => {
+              setModalPayload(p);
+              setModalOpen(true);
+            }}
+            className="flex flex-col md:flex-row gap-3 cursor-pointer"
+          >
+            <img src={p.preview} alt={p.filename} className="w-28 h-28 rounded-md object-cover border flex-shrink-0" />
+            <div className="flex-1 flex flex-col justify-between">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-sm font-semibold">{p.readable}</div>
-                  <div className="text-xs text-gray-400">
-                    Confidence: {p.confidence}
-                  </div>
-                </div>
-                <div>
-                  <button
-                    onClick={() => sendToAiSdk(p)}
-                    className="bg-[#0b7a5b] px-3 py-1 rounded-md text-xs font-semibold hover:bg-[#09664c]"
-                  >
-                    Send to AI SDK
-                  </button>
+                  <div className="text-xs text-gray-400">Confidence: {p.confidence}</div>
                 </div>
               </div>
 
               <div className="mt-2 text-sm text-gray-200">{p.advice}</div>
 
-              <details className="mt-2 text-xs text-gray-400">
-                <summary className="cursor-pointer">View payload</summary>
-                <pre className="text-xs bg-[#070707] p-2 rounded mt-2 overflow-auto">
-                  {JSON.stringify(
-                    {
-                      filename: p.filename,
-                      label: p.label,
-                      confidence: p.confidence,
-                      advice: p.advice,
-                    },
-                    null,
-                    2
-                  )}
-                </pre>
-              </details>
+              {/* BIG button instead of "Send to AI SDK"
+                  - stopPropagation so clicking the button doesn't trigger the outer card onClick twice */}
+              <div className="mt-3">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    getMoreInfo(p);
+                  }}
+                  aria-label={`Get more info about ${p.readable}`}
+                  className="block w-full touch-manipulation bg-[#10a37f] text-white py-3 rounded-xl font-semibold hover:bg-[#0d8b6f] text-center"
+                >
+                  Get More Info
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -382,9 +343,7 @@ export default function App() {
     <div className="min-h-screen flex bg-[#0b0b0c] text-white pb-32">
       {/* Left sidebar */}
       <aside className="w-16 bg-[#0a0a0b] border-r border-gray-900 flex flex-col items-center py-4 gap-4">
-        <div className="w-10 h-10 bg-white/10 rounded flex items-center justify-center text-lg">
-          🌾
-        </div>
+        <div className="w-10 h-10 bg-white/10 rounded flex items-center justify-center text-lg">🌾</div>
       </aside>
 
       <div className="flex-1 flex flex-col">
@@ -394,19 +353,12 @@ export default function App() {
             <div className="text-xs text-gray-400">AI Crop Disease Chat</div>
           </div>
           <div className="text-xs text-gray-400">
-            {loadingModel
-              ? "Loading model..."
-              : predicting
-              ? "Analyzing..."
-              : "Ready"}
+            {loadingModel ? "Loading model..." : predicting ? "Analyzing..." : "Ready"}
           </div>
         </header>
 
         {/* Chat messages */}
-        <main
-          ref={scrollRef}
-          className="flex-1 px-6 py-4 overflow-auto flex flex-col gap-4"
-        >
+        <main ref={scrollRef} className="flex-1 px-6 py-4 overflow-auto flex flex-col gap-4">
           <AnimatePresence initial={false}>
             {messages.map((m) => (
               <ChatBubble key={m.id} msg={m} />
@@ -421,15 +373,8 @@ export default function App() {
               {/* thumbnails row inside pill (top) */}
               <div className="flex gap-2 mb-3 items-center overflow-x-auto">
                 {selectedPreviews.map((u, i) => (
-                  <div
-                    key={i}
-                    className="relative group w-20 h-12 rounded-md overflow-hidden border"
-                  >
-                    <img
-                      src={u}
-                      alt={`sel-${i}`}
-                      className="w-full h-full object-cover"
-                    />
+                  <div key={i} className="relative group w-20 h-12 rounded-md overflow-hidden border">
+                    <img src={u} alt={`sel-${i}`} className="w-full h-full object-cover" />
                     <button
                       onClick={() => removeSelected(i)}
                       className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 hidden group-hover:flex items-center justify-center"
@@ -442,9 +387,11 @@ export default function App() {
 
               {/* bottom row: plus (left), text input, mic, send */}
               <div className="flex items-center gap-3">
-                {/* round green + at left side of text input */}
-                <label className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center bg-[#10a37f] text-white cursor-pointer">
-                  <FiPlus />
+                <label className="w-30 h-10 flex-shrink-0 rounded-full flex items-center justify-center bg-[#10a37f] text-white cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <FiPlus />
+                    <p>Add Image</p>
+                  </div>
                   <input
                     ref={fileInputRef}
                     className="hidden"
@@ -471,10 +418,7 @@ export default function App() {
                   }}
                 />
 
-                <button
-                  className="p-2 rounded-full hover:bg-gray-800"
-                  title="Voice (placeholder)"
-                >
+                <button className="p-2 rounded-full hover:bg-gray-800" title="Voice (placeholder)">
                   <FiMic className="text-gray-300" />
                 </button>
 
@@ -484,11 +428,7 @@ export default function App() {
                     handleSendPredict(val || null);
                     if (textRef.current) textRef.current.value = "";
                   }}
-                  disabled={
-                    loadingModel ||
-                    predicting ||
-                    (selectedFiles.length === 0 && !textRef.current?.value)
-                  }
+                  disabled={loadingModel || predicting || (selectedFiles.length === 0 && !textRef.current?.value)}
                   className="p-3 rounded-full bg-[#10a37f] hover:bg-[#0d8b6f] disabled:opacity-40 flex items-center justify-center"
                   title="Send / Predict"
                 >
@@ -498,6 +438,82 @@ export default function App() {
             </div>
           </div>
         </div>
+
+        {/* Modal for Get More Info */}
+        <AnimatePresence>
+          {modalOpen && modalPayload && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center"
+            >
+              {/* overlay */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.6 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setModalOpen(false)}
+                className="absolute inset-0 bg-black"
+              />
+
+              <motion.div
+                initial={{ y: 20, opacity: 0, scale: 0.98 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: 20, opacity: 0, scale: 0.98 }}
+                className="relative bg-[#0f1112] max-w-lg w-full mx-4 rounded-2xl p-4 shadow-lg border border-gray-800 z-10"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-title"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <img src={modalPayload.preview} alt={modalPayload.filename} className="w-20 h-20 rounded-md object-cover border" />
+                    <div>
+                      <h3 id="modal-title" className="text-lg font-semibold">{modalPayload.readable}</h3>
+                      <div className="text-xs text-gray-400">Confidence: {modalPayload.confidence}</div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setModalOpen(false)}
+                    aria-label="Close"
+                    className="p-2 rounded-full hover:bg-gray-800"
+                  >
+                    <FiX />
+                  </button>
+                </div>
+
+                <div className="mt-4 text-sm text-gray-200">{modalPayload.advice}</div>
+
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => {
+                      // copy advice to clipboard
+                      try {
+                        navigator.clipboard.writeText(modalPayload.advice);
+                      } catch {}
+                    }}
+                    className="flex-1 bg-[#10a37f] py-2 rounded-lg text-sm font-semibold hover:bg-[#0d8b6f]"
+                  >
+                    Copy Advice
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      // fallback action: close modal and optionally push a bot message
+                      setModalOpen(false);
+                      pushBotMessage(`💡 Advice saved: ${modalPayload.readable}`);
+                    }}
+                    className="flex-1 bg-gray-800 py-2 rounded-lg text-sm font-semibold hover:bg-gray-700"
+                  >
+                    Save & Close
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
