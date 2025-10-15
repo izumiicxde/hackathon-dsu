@@ -20,43 +20,113 @@
     <div id="result"></div>
   </div>
 
-  <script>
-    const LABELS = [
-      "Cashew_Healthy", "Cashew_Diseased",
-      "Cassava_Healthy", "Cassava_Diseased",
-      "Maize_Healthy", "Maize_Diseased",
-      "Tomato_Healthy", "Tomato_Diseased"
-    ];
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script>
+/* === CONFIG: update if your model has different labels or input size === */
+const LABELS = [
+  "Cashew_Healthy","Cashew_Diseased",
+  "Cassava_Healthy","Cassava_Diseased",
+  "Maize_Healthy","Maize_Diseased",
+  "Tomato_Healthy","Tomato_Diseased"
+];
+const INPUT_SIZE = 224; // change if your model expects other size
+const MODEL_PATH = 'model/model.json'; // ensure this is correct
 
-    let model;
-    async function loadModel() {
-      model = await tf.loadLayersModel('model/model.json');
-      console.log("Model loaded!");
-    }
-    loadModel();
+/* === UI elements === */
+const fileInput = document.getElementById('file-input');
+const previewImg = document.getElementById('preview');
+const resultDiv = document.getElementById('result');
 
-    document.getElementById('file-input').addEventListener('change', async (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-      const img = document.getElementById('preview');
-      img.src = URL.createObjectURL(file);
+let model = null;
+let modelReady = false;
 
-      const image = tf.browser.fromPixels(img).resizeNearestNeighbor([224, 224]).toFloat().expandDims();
-      const prediction = await model.predict(image).data();
-      const maxIdx = prediction.indexOf(Math.max(...prediction));
-      const result = LABELS[maxIdx];
+/* Disable input until model loads */
+fileInput.disabled = true;
+resultDiv.innerHTML = 'Loading model... please wait';
 
-      document.getElementById('result').innerHTML = `<b>Detected:</b> ${result.replace('_', ' ')}`;
+/* Load model and enable input */
+async function loadModel(){
+  try{
+    model = await tf.loadLayersModel(MODEL_PATH);
+    modelReady = true;
+    console.log('Model loaded from', MODEL_PATH);
+    resultDiv.innerHTML = 'Model loaded. Upload an image to predict.';
+    fileInput.disabled = false;
+  } catch(err){
+    console.error('Model load error', err);
+    resultDiv.innerHTML = 'Error loading model. Check console for details.';
+  }
+}
+loadModel();
 
-      const advice = {
-        "Cashew_Diseased": "Spray neem oil and remove infected leaves.",
-        "Cassava_Diseased": "Use compost and avoid overwatering.",
-        "Maize_Diseased": "Rotate crops and use Trichoderma-based compost.",
-        "Tomato_Diseased": "Use cow dung slurry and neem extract weekly."
-      };
-      const remedy = advice[result] || "Looks healthy! Keep soil moist and balanced.";
-      document.getElementById('result').innerHTML += `<br><b>Advice:</b> ${remedy}`;
+/* Wait for image to be fully loaded before predicting */
+function predictFromImageElement(imgElement){
+  if(!modelReady){
+    console.warn('Model not ready');
+    resultDiv.innerHTML = 'Model still loading...';
+    return;
+  }
+  try{
+    // Preprocess image: convert to tensor, resize, normalize
+    let t = tf.browser.fromPixels(imgElement).resizeNearestNeighbor([INPUT_SIZE, INPUT_SIZE]).toFloat();
+    // If model expects normalization 0-1:
+    t = t.div(255.0).expandDims(0);
+    // Run prediction
+    model.predict(t).data().then(preds => {
+      console.log('raw predictions array:', preds);
+      // find top index
+      let maxIdx = 0;
+      for(let i=1;i<preds.length;i++){
+        if(preds[i] > preds[maxIdx]) maxIdx = i;
+      }
+      const confidence = preds[maxIdx];
+      const label = LABELS[maxIdx] || ('class_'+maxIdx);
+      // show results
+      const confPct = (confidence*100).toFixed(1) + '%';
+      let adviceText = {
+        "Cashew_Diseased":"Spray neem oil and remove infected leaves.",
+        "Cassava_Diseased":"Use compost and avoid overwatering.",
+        "Maize_Diseased":"Rotate crops and use Trichoderma-based compost.",
+        "Tomato_Diseased":"Use cow dung slurry and neem extract weekly."
+      }[label] || "Looks healthy or unknown. Please retake photo if unsure.";
+      // low confidence fallback
+      if(confidence < 0.60){
+        resultDiv.innerHTML = `<b>Prediction uncertain (${confPct}).</b><br>Please retake photo or check lighting.`;
+      } else {
+        resultDiv.innerHTML = `<b>Detected:</b> ${label.replace('_',' ')} <br><b>Confidence:</b> ${confPct} <br><b>Advice:</b> ${adviceText}`;
+      }
+      t.dispose();
+    }).catch(err => {
+      console.error('Prediction error (promise)', err);
+      resultDiv.innerText = 'Error during prediction. See console.';
     });
-  </script>
+  } catch(err){
+    console.error('Prediction error', err);
+    resultDiv.innerText = 'Prediction failed. See console for details.';
+  }
+}
+
+/* File input listener */
+fileInput.addEventListener('change', (evt) => {
+  const file = evt.target.files && evt.target.files[0];
+  if(!file) return;
+  // Show preview first
+  previewImg.src = URL.createObjectURL(file);
+  resultDiv.innerHTML = 'Image loaded — waiting for image decoding...';
+
+  // Wait until image element finished loading / decoding
+  previewImg.onload = () => {
+    console.log('Preview image loaded, size:', previewImg.naturalWidth, previewImg.naturalHeight);
+    // small delay sometimes helps on some browsers
+    setTimeout(()=> predictFromImageElement(previewImg), 50);
+  };
+
+  previewImg.onerror = (e) => {
+    console.error('Error loading preview image', e);
+    resultDiv.innerText = 'Could not load image preview. Try a different photo.';
+  };
+});
+</script>
+
 </body>
 </html>
