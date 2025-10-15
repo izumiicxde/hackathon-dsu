@@ -18,24 +18,24 @@ app.use(
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-app.get("/api/v1", (req, res) => {
-  res.json({ message: "api is healthy", status: 200 });
+app.get("/api/v1", async (req, res) => {
+  const models = await genAI.listModels();
+  console.log(models);
+
+  res.json({ message: "api is healthy", status: 200, models });
 });
 
 app.post("/api/v1/agent-response", async (req, res) => {
   try {
     // Destructure from request body
-    // const { label, advice, confidence } = req.body;
-    const b = req.body;
-    console.log(b);
-    return res.json({ message: "done" });
+    const { label, advice, confidence } = req.body;
 
     if (!label || !advice || !confidence) {
       return res
         .status(400)
         .json({ error: "Missing required fields: label, advice, confidence" });
     }
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Prompt including TF info and asking for simple explanation
     const prompt = `
@@ -55,7 +55,7 @@ Instructions:
    - Pest control: how well pests will reduce
    - Soil health: how soil improves
 5. Include any precaution or simple tips for recurrence prevention.
-6. Keep the explanation short, easy to remember, and local language friendly (can include Kannada words if useful).
+6. Keep the explanation short, easy to remember, and local language friendly (can include Kannada words if useful) and also give it in english...
 
 Structure the output as:
 
@@ -63,6 +63,7 @@ Structure the output as:
 - Simple Action Steps:
 - Daily Routine / Tips:
 - Expected Outcome:
+In the context you get 'Valid leaf detected or uncertain' just say that the leaft seems healthy and continue the nurturing process as is...
 `;
 
     const result = await model.generateContent(prompt);

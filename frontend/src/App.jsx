@@ -2,8 +2,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as tf from "@tensorflow/tfjs";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiPlus, FiSend, FiX, FiMic } from "react-icons/fi";
+import { FiLoader, FiPlus, FiSend, FiX, FiMic } from "react-icons/fi";
 import "./App.css"; // Tailwind + your CSS
+import axios from "axios";
 
 // Labels must match your model
 const LABELS = [
@@ -34,6 +35,8 @@ export default function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState(null);
 
+  const [isRequestSent, setIsRequestSent] = useState(false);
+
   const fileInputRef = useRef(null);
   const textRef = useRef(null);
   const scrollRef = useRef(null);
@@ -57,6 +60,40 @@ export default function App() {
     return () => selectedPreviews.forEach((u) => URL.revokeObjectURL(u));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  let controller; // store AbortController globally or per component
+
+  const sendToAiSdk = async (payload) => {
+    try {
+      if (isRequestSent) {
+        console.log("cancelled");
+        controller?.abort();
+      }
+
+      // Create a new AbortController for this request
+      controller = new AbortController();
+
+      setIsRequestSent(true);
+
+      const res = await axios.post(
+        "http://localhost:8000/api/v1/agent-response",
+        payload,
+        { signal: controller.signal } // attach the signal to Axios
+      );
+
+      console.log(res.data);
+    } catch (error) {
+      if (axios.isCancel(error)) {
+        console.log("Request canceled:", error.message);
+      } else if (error.name === "CanceledError") {
+        console.log("Request aborted:", error.message);
+      } else {
+        console.error(error);
+      }
+    } finally {
+      setIsRequestSent(false);
+    }
+  };
 
   // close modal on Esc
   useEffect(() => {
@@ -326,37 +363,30 @@ export default function App() {
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -8 }}
-          className="self-start bg-[#0f1112] p-3 rounded-xl shadow-md border border-gray-800 max-w-[92%]"
+          className="self-start bg-[#0f1112] p-3 rounded-xl shadow-md border border-gray-800 max-w-[92%] "
         >
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-col justify-center items-center w-96 overflow-hidden">
             <img
               src={p.preview}
               alt={p.filename}
-              className="w-28 h-28 rounded-md object-cover border"
+              className="w-full max-w-64 h-auto aspect-square rounded-md object-cover border"
             />
             <div className="flex-1">
-              <div className="flex items-start justify-between">
+              <div className="flex  items-start justify-between">
                 <div>
                   <div className="text-sm font-semibold">{p.readable}</div>
                   <div className="text-xs text-gray-400">
                     Confidence: {p.confidence}
                   </div>
                 </div>
-                <div>
-                  <button
-                    onClick={() => sendToAiSdk(p)}
-                    className="bg-[#0b7a5b] px-3 py-1 rounded-md text-xs font-semibold hover:bg-[#09664c]"
-                  >
-                    Send to AI SDK
-                  </button>
-                </div>
+                <div></div>
               </div>
 
               <div className="mt-2 text-sm text-gray-200">{p.advice}</div>
 
-              <details className="mt-2 text-xs text-gray-400">
+              {/* <details className="mt-2 text-xs text-gray-400 overflow-hidden">
                 <summary className="cursor-pointer">View payload</summary>
-                <pre className="text-xs bg-[#070707] p-2 rounded mt-2 overflow-auto">
+                <pre className="text-xs bg-[#070707] p-2 rounded mt-2 overflow-auto w-full px-5">
                   {JSON.stringify(
                     {
                       filename: p.filename,
@@ -368,7 +398,20 @@ export default function App() {
                     2
                   )}
                 </pre>
-              </details>
+              </details> */}
+              <button
+                onClick={() => sendToAiSdk(p)}
+                className="bg-[#0b7a5b] px-5 py-3 my-5 rounded-md text-md font-semibold hover:bg-[#09664c] w-full cursor-pointer text-center flex justify-center items-center"
+              >
+                {isRequestSent ? (
+                  <>
+                    <FiLoader className="size-5 animate-spin" />
+                    <p className="px-2">Getting the information...</p>
+                  </>
+                ) : (
+                  "Get More Info"
+                )}
+              </button>
             </div>
           </div>
         </motion.div>
