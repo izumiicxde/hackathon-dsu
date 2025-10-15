@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import * as tf from "@tensorflow/tfjs";
+import "./App.css";
 
 const LABELS = [
   "Cashew_Healthy",
@@ -93,7 +94,7 @@ export default function App() {
   const handleImageLoad = (e) => predict(e.target);
 
   return (
-    <div className="min-h-screen  flex flex-col items-center p-6 bg-red-500 text-red-500">
+    <div className="min-h-screen  flex flex-col items-center p-6 ">
       <h1 className="text-3xl font-bold text-green-700 mb-6">
         KrishiRakshak - AI Crop Disease Detector
       </h1>
