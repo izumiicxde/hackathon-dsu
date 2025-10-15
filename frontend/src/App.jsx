@@ -37,7 +37,7 @@ export default function App() {
   const [modalPayload, setModalPayload] = useState(null);
 
   const [isRequestSent, setIsRequestSent] = useState(false);
-  const [agentData, setAgentData] = useState(null);
+  const [agentData, setAgentData] = useState();
 
   const fileInputRef = useRef(null);
   const textRef = useRef(null);
@@ -571,7 +571,11 @@ export default function App() {
                     </div>
                   </div>
                   <div className="">
-                    <ReactMarkdown>{JSON.stringify(agentData)}</ReactMarkdown>
+                    <ReactMarkdown>
+                      {agentData !== null &&
+                        agentData !== "" &&
+                        JSON.stringify(agentData)}
+                    </ReactMarkdown>
                   </div>
 
                   <button
