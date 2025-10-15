@@ -319,7 +319,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex bg-[#0b0b0c] text-white">
+    <div className="min-h-screen flex bg-[#0b0b0c] text-white pb-32">
       {/* Left sidebar */}
       <aside className="w-16 bg-[#0a0a0b] border-r border-gray-900 flex flex-col items-center py-4 gap-4">
         <div className="w-10 h-10 bg-white/10 rounded flex items-center justify-center text-lg">🌾</div>
@@ -363,10 +363,13 @@ export default function App() {
               </div>
 
               {/* bottom row: plus (left), text input, mic, send (all inside pill) */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 ">
                 {/* round green + at left side of text input */}
-                <label className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center bg-[#10a37f] text-white cursor-pointer">
-                  <FiPlus />
+                <label className="w-30 h-10 flex-shrink-0 rounded-full flex items-center justify-center bg-[#10a37f] text-white cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <FiPlus />
+                    <p>Add Image</p>
+                  </div>
                   <input ref={fileInputRef} className="hidden" type="file" accept="image/*" multiple onChange={handleFileSelect} disabled={loadingModel || predicting} />
                 </label>
 
