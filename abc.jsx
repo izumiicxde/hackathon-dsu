@@ -4,7 +4,6 @@ import * as tf from "@tensorflow/tfjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiLoader, FiPlus, FiSend, FiX, FiMic } from "react-icons/fi";
 import "./App.css"; // Tailwind + your CSS
-import ReactMarkdown from "react-markdown";
 import axios from "axios";
 
 // Labels must match your model
@@ -32,17 +31,17 @@ export default function App() {
   const [loadingModel, setLoadingModel] = useState(true);
   const [predicting, setPredicting] = useState(false);
 
-  // modal state for "Get More Info"
   const [modalOpen, setModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState(null);
-
   const [isRequestSent, setIsRequestSent] = useState(false);
 
   const fileInputRef = useRef(null);
   const textRef = useRef(null);
   const scrollRef = useRef(null);
 
-  // Model load
+  let controller;
+
+  // Load TensorFlow model
   useEffect(() => {
     (async () => {
       try {
@@ -62,8 +61,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  let controller; // store AbortController globally or per component
-
   const sendToAiSdk = async (payload) => {
     try {
       if (isRequestSent) {
@@ -71,15 +68,13 @@ export default function App() {
         controller?.abort();
       }
 
-      // Create a new AbortController for this request
       controller = new AbortController();
-
       setIsRequestSent(true);
 
       const res = await axios.post(
         "http://localhost:8000/api/v1/agent-response",
-        { ...payload, messages },
-        { signal: controller.signal } // attach the signal to Axios
+        payload,
+        { signal: controller.signal }
       );
 
       console.log(res.data);
@@ -96,7 +91,7 @@ export default function App() {
     }
   };
 
-  // close modal on Esc
+  // Close modal on Esc key
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") setModalOpen(false);
@@ -105,7 +100,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // smooth autoscroll when messages change
+  // Smooth autoscroll when messages change
   useEffect(() => {
     if (!scrollRef.current) return;
     const t = setTimeout(() => {
@@ -126,29 +121,34 @@ export default function App() {
       ...m,
       { id: Date.now() + Math.random(), type: "user", text, imgs },
     ]);
+
   const pushBotMessage = (text) =>
     setMessages((m) => [
       ...m,
       { id: Date.now() + Math.random(), type: "bot", text },
     ]);
+
   const pushBotTyping = () =>
     setMessages((m) => [
       ...m,
       { id: "typing-" + Date.now(), type: "botTyping" },
     ]);
+
   const removeBotTyping = () =>
     setMessages((m) => m.filter((x) => x.type !== "botTyping"));
 
-  // file selection (creates fresh previews)
+  // File selection
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+
     const allowed = Math.max(0, 4 - selectedFiles.length);
     const toAdd = files.slice(0, allowed);
     if (files.length > allowed) alert(`Max 4 images. Added first ${allowed}.`);
+
     const newFiles = [...selectedFiles, ...toAdd];
 
-    // revoke previous previews and create new previews for current files
+    // revoke previous previews and create new previews
     selectedPreviews.forEach((u) => URL.revokeObjectURL(u));
     const newPreviews = newFiles.map((f) => URL.createObjectURL(f));
 
@@ -163,25 +163,30 @@ export default function App() {
     const toRevoke = selectedPreviews[idx];
     URL.revokeObjectURL(toRevoke);
     const nextPreviews = selectedPreviews.filter((_, i) => i !== idx);
+
     setSelectedFiles(nextFiles);
     setSelectedPreviews(nextPreviews);
   };
 
-  // predict using fresh object URL per file
+  // Predict using TensorFlow
   const predictImageElement = async (imgEl) => {
     if (!model) throw new Error("Model not ready");
+
     const t = tf.browser
       .fromPixels(imgEl)
       .resizeNearestNeighbor([INPUT_SIZE, INPUT_SIZE])
       .toFloat()
       .div(255.0)
       .expandDims(0);
+
     const preds = await model.predict(t).data();
     t.dispose();
+
     const maxIdx = preds.indexOf(Math.max(...preds));
     const conf = preds[maxIdx];
     let label = LABELS[maxIdx] ?? "Unknown";
     if (conf < CONF_THRESHOLD) label = "Unknown";
+
     return { label, confidence: (conf * 100).toFixed(1) + "%", raw: preds };
   };
 
@@ -194,15 +199,14 @@ export default function App() {
       "Valid leaf detected or uncertain — retake photo from multiple angles.",
   };
 
-  // Get More Info action -> open modal instead of pushing bot message
   const getMoreInfo = (payload) => {
     setModalPayload(payload);
     setModalOpen(true);
   };
 
-  // handle send/predict
   const handleSendPredict = async (userText = null) => {
     if (loadingModel || predicting) return;
+
     if (selectedFiles.length === 0 && !userText) {
       alert("Attach images (up to 4) or type a message.");
       return;
@@ -215,7 +219,6 @@ export default function App() {
     pushUserMessage(userMsgText, selectedPreviews);
 
     const filesToProcess = [...selectedFiles];
-
     setSelectedFiles([]);
     setSelectedPreviews([]);
 
@@ -268,11 +271,7 @@ export default function App() {
 
       setMessages((m) => [
         ...m,
-        {
-          id: Date.now() + Math.random(),
-          type: "botCard",
-          payload,
-        },
+        { id: Date.now() + Math.random(), type: "botCard", payload },
       ]);
     }
 
@@ -280,7 +279,6 @@ export default function App() {
     setPredicting(false);
   };
 
-  // Chat bubble renderer
   const ChatBubble = ({ msg }) => {
     if (msg.type === "user") {
       return (
@@ -343,30 +341,21 @@ export default function App() {
 
     if (msg.type === "botCard") {
       const p = msg.payload;
-
-      // card click opens modal on small screens (and still leaves button available)
       return (
         <motion.div
           layout
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -8 }}
-          className="self-start bg-[#0f1112] p-3 rounded-xl shadow-md border border-gray-800 max-w-[92%] "
+          className="self-start bg-[#0f1112] p-3 rounded-xl shadow-md border border-gray-800 max-w-[92%]"
         >
-          <div
-            // clicking the card (outside the button) opens modal for ease on touch devices
-            onClick={() => {
-              setModalPayload(p);
-              setModalOpen(true);
-            }}
-            className="flex flex-col  gap-3 cursor-pointer  justify-center items-center"
-          >
+          <div className="flex gap-3">
             <img
               src={p.preview}
               alt={p.filename}
-              className="w-64 h-fit rounded-md object-cover border flex-shrink-0"
+              className="w-28 h-28 rounded-md object-cover border"
             />
-            <div className="flex-1 flex flex-col justify-between">
+            <div className="flex-1">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-sm font-semibold">{p.readable}</div>
@@ -374,25 +363,31 @@ export default function App() {
                     Confidence: {p.confidence}
                   </div>
                 </div>
+                <div>
+                  <button
+                    onClick={() => sendToAiSdk(p)}
+                    className="bg-[#0b7a5b] px-3 py-1 rounded-md text-xs font-semibold hover:bg-[#09664c]"
+                  >
+                    Send to AI SDK
+                  </button>
+                </div>
               </div>
-
               <div className="mt-2 text-sm text-gray-200">{p.advice}</div>
-
-              {/* BIG button instead of "Send to AI SDK"
-                  - stopPropagation so clicking the button doesn't trigger the outer card onClick twice */}
-              <div className="mt-3">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    sendToAiSdk(p);
-                    getMoreInfo(p);
-                  }}
-                  aria-label={`Get more info about ${p.readable}`}
-                  className="block w-full touch-manipulation bg-[#10a37f] text-white py-3 rounded-xl font-semibold hover:bg-[#0d8b6f] text-center"
-                >
-                  Get More Info
-                </button>
-              </div>
+              <details className="mt-2 text-xs text-gray-400">
+                <summary className="cursor-pointer">View payload</summary>
+                <pre className="text-xs bg-[#070707] p-2 rounded mt-2 overflow-auto">
+                  {JSON.stringify(
+                    {
+                      filename: p.filename,
+                      label: p.label,
+                      confidence: p.confidence,
+                      advice: p.advice,
+                    },
+                    null,
+                    2
+                  )}
+                </pre>
+              </details>
             </div>
           </div>
         </motion.div>
@@ -412,6 +407,7 @@ export default function App() {
       </aside>
 
       <div className="flex-1 flex flex-col">
+        {/* Header */}
         <header className="px-6 py-4 border-b border-gray-900 flex items-center justify-between">
           <div>
             <div className="text-lg font-semibold">KrishiRakshak</div>
@@ -438,11 +434,11 @@ export default function App() {
           </AnimatePresence>
         </main>
 
-        {/* Fixed input pill centered */}
+        {/* Input area */}
         <div className="fixed left-1/2 transform -translate-x-1/2 bottom-6 w-full max-w-3xl px-4">
           <div className="relative">
             <div className="bg-[#111214] border border-gray-800 rounded-xl shadow-lg px-3 py-3">
-              {/* thumbnails row inside pill (top) */}
+              {/* Thumbnails row */}
               <div className="flex gap-2 mb-3 items-center overflow-x-auto">
                 {selectedPreviews.map((u, i) => (
                   <div
@@ -464,7 +460,7 @@ export default function App() {
                 ))}
               </div>
 
-              {/* bottom row: plus (left), text input, mic, send */}
+              {/* Bottom row: add image, input, mic, send */}
               <div className="flex items-center gap-3">
                 <label className="w-30 h-10 flex-shrink-0 rounded-full flex items-center justify-center bg-[#10a37f] text-white cursor-pointer">
                   <div className="flex items-center gap-2">
@@ -525,7 +521,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Modal for Get More Info */}
+        {/* Modal */}
         <AnimatePresence>
           {modalOpen && modalPayload && (
             <motion.div
@@ -534,7 +530,6 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-50 flex items-center justify-center"
             >
-              {/* overlay */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 0.6 }}
@@ -568,7 +563,6 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-
                   <button
                     onClick={() => setModalOpen(false)}
                     aria-label="Close"
@@ -585,7 +579,6 @@ export default function App() {
                 <div className="mt-4 flex gap-2">
                   <button
                     onClick={() => {
-                      // copy advice to clipboard
                       try {
                         navigator.clipboard.writeText(modalPayload.advice);
                       } catch {}
@@ -597,7 +590,6 @@ export default function App() {
 
                   <button
                     onClick={() => {
-                      // fallback action: close modal and optionally push a bot message
                       setModalOpen(false);
                       pushBotMessage(
                         `💡 Advice saved: ${modalPayload.readable}`

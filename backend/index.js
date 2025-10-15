@@ -28,13 +28,14 @@ app.get("/api/v1", async (req, res) => {
 app.post("/api/v1/agent-response", async (req, res) => {
   try {
     // Destructure from request body
-    const { label, advice, confidence } = req.body;
+    const { label, advice, confidence, messages } = req.body;
 
-    if (!label || !advice || !confidence) {
+    if (!label || !advice || !confidence || messages.length <= 0) {
       return res
         .status(400)
         .json({ error: "Missing required fields: label, advice, confidence" });
     }
+    console.log(label, messages);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Prompt including TF info and asking for simple explanation
@@ -44,6 +45,7 @@ You have the following information:
 
 - Detected Issue: ${label} 
 - TensorFlow Model Advice: ${advice} (confidence: ${confidence})
+- User input regarding the data: ${messages}
 
 Instructions:
 
