@@ -30,6 +30,10 @@ export default function App() {
   const [loadingModel, setLoadingModel] = useState(true);
   const [predicting, setPredicting] = useState(false);
 
+  // modal state for "Get More Info"
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalPayload, setModalPayload] = useState(null);
+
   const fileInputRef = useRef(null);
   const textRef = useRef(null);
   const scrollRef = useRef(null);
@@ -52,6 +56,15 @@ export default function App() {
     // cleanup preview URLs on unmount
     return () => selectedPreviews.forEach((u) => URL.revokeObjectURL(u));
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // close modal on Esc
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") setModalOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   // smooth autoscroll when messages change
@@ -104,7 +117,7 @@ export default function App() {
     setSelectedPreviews(nextPreviews);
   };
 
-  // predict using fresh object URL per file (avoid revoked URLs)
+  // predict using fresh object URL per file
   const predictImageElement = async (imgEl) => {
     if (!model) throw new Error("Model not ready");
     const t = tf.browser
@@ -130,13 +143,13 @@ export default function App() {
     Unknown: "Valid leaf detected or uncertain — retake photo from multiple angles.",
   };
 
-  // placeholder for SDK call
-  const sendToAiSdk = async (payload) => {
-    console.log("Send to AI SDK:", payload);
-    pushBotMessage(`✅ Sent ${payload.filename} to AI SDK.`);
+  // Get More Info action -> open modal instead of pushing bot message
+  const getMoreInfo = (payload) => {
+    setModalPayload(payload);
+    setModalOpen(true);
   };
 
-  // handle send/predict: post user bubble, show typing, predict per file using fresh blob URLs
+  // handle send/predict
   const handleSendPredict = async (userText = null) => {
     if (loadingModel || predicting) return;
     if (selectedFiles.length === 0 && !userText) {
@@ -148,24 +161,18 @@ export default function App() {
       ? `${userText} (${selectedFiles.length} image(s))`
       : `Sent ${selectedFiles.length} image(s) for analysis.`;
 
-    // push user message with previews (these previews remain valid for message display)
     pushUserMessage(userMsgText, selectedPreviews);
 
-    // copy arrays for processing
     const filesToProcess = [...selectedFiles];
 
-    // clear UI selections (chat-like)
     setSelectedFiles([]);
     setSelectedPreviews([]);
 
-    // show typing indicator
     pushBotTyping();
     setPredicting(true);
 
     for (let i = 0; i < filesToProcess.length; i++) {
       const file = filesToProcess[i];
-
-      // create a fresh object URL for processing and revoke after use
       const processingUrl = URL.createObjectURL(file);
       const imgEl = new Image();
       imgEl.src = processingUrl;
@@ -177,7 +184,6 @@ export default function App() {
         });
       } catch (err) {
         console.error("Image load error", err);
-        // remove typing and show a bot error for this file
         removeBotTyping();
         pushBotMessage("Failed to load one image for analysis.");
         URL.revokeObjectURL(processingUrl);
@@ -185,7 +191,6 @@ export default function App() {
         return;
       }
 
-      // run prediction
       let pred;
       try {
         pred = await predictImageElement(imgEl);
@@ -198,12 +203,11 @@ export default function App() {
         return;
       }
 
-      // build payload
       const readable = pred.label.replace("_", " ");
       const advice = adviceMap[pred.label] || adviceMap["Unknown"];
       const payload = {
         filename: file.name,
-        preview: processingUrl, // pass the processing url as preview in bot card
+        preview: processingUrl,
         label: pred.label,
         readable,
         confidence: pred.confidence,
@@ -211,7 +215,6 @@ export default function App() {
         raw: pred.raw,
       };
 
-      // push bot card for this image
       setMessages((m) => [
         ...m,
         {
@@ -220,20 +223,9 @@ export default function App() {
           payload,
         },
       ]);
-
-      // revoke the processing URL AFTER a small delay so the bot card can show the image
-      // (we will keep it for some time; in production upload image and use a real URL)
-      setTimeout(() => {
-        // revoke only if the preview isn't part of a user message (we used fresh URL)
-        // safe to revoke; but bot card already references it — to be safe, we won't revoke here.
-        // If needed, implement uploading and use returned URLs. We'll skip revoke to keep bot card image.
-        // URL.revokeObjectURL(processingUrl);
-      }, 5000);
     }
 
-    // remove typing and show completion
     removeBotTyping();
-    pushBotMessage("Analysis complete. Tap 'Send to AI SDK' on any card to forward structured output.");
     setPredicting(false);
   };
 
@@ -241,8 +233,13 @@ export default function App() {
   const ChatBubble = ({ msg }) => {
     if (msg.type === "user") {
       return (
-        <motion.div layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
-          className="self-end bg-[#0b7a5b] text-white p-3 rounded-2xl max-w-[80%] shadow">
+        <motion.div
+          layout
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 6 }}
+          className="self-end bg-[#0b7a5b] text-white p-3 rounded-2xl max-w-[80%] shadow"
+        >
           <div className="text-sm whitespace-pre-wrap">{msg.text}</div>
           {msg.imgs && msg.imgs.length > 0 && (
             <div className="flex gap-2 mt-3">
@@ -257,8 +254,13 @@ export default function App() {
 
     if (msg.type === "bot") {
       return (
-        <motion.div layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
-          className="self-start bg-[#121214] text-gray-200 p-3 rounded-2xl max-w-[80%] shadow">
+        <motion.div
+          layout
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 6 }}
+          className="self-start bg-[#121214] text-gray-200 p-3 rounded-2xl max-w-[80%] shadow"
+        >
           <div className="text-sm whitespace-pre-wrap">{msg.text}</div>
         </motion.div>
       );
@@ -266,8 +268,13 @@ export default function App() {
 
     if (msg.type === "botTyping") {
       return (
-        <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className="self-start bg-[#121214] text-gray-200 p-3 rounded-2xl max-w-[40%] shadow">
+        <motion.div
+          layout
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="self-start bg-[#121214] text-gray-200 p-3 rounded-2xl max-w-[40%] shadow"
+        >
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
             <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse animation-delay-150" />
@@ -280,35 +287,49 @@ export default function App() {
 
     if (msg.type === "botCard") {
       const p = msg.payload;
+
+      // card click opens modal on small screens (and still leaves button available)
       return (
-        <motion.div layout initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}
-          className="self-start bg-[#0f1112] p-3 rounded-xl shadow-md border border-gray-800 max-w-[92%]">
-          <div className="flex gap-3">
-            <img src={p.preview} alt={p.filename} className="w-28 h-28 rounded-md object-cover border" />
-            <div className="flex-1">
+        <motion.div
+          layout
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -8 }}
+          className="self-start bg-[#0f1112] p-3 rounded-xl shadow-md border border-gray-800 max-w-[92%]"
+        >
+          <div
+            // clicking the card (outside the button) opens modal for ease on touch devices
+            onClick={() => {
+              setModalPayload(p);
+              setModalOpen(true);
+            }}
+            className="flex flex-col md:flex-row gap-3 cursor-pointer"
+          >
+            <img src={p.preview} alt={p.filename} className="w-28 h-28 rounded-md object-cover border flex-shrink-0" />
+            <div className="flex-1 flex flex-col justify-between">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-sm font-semibold">{p.readable}</div>
                   <div className="text-xs text-gray-400">Confidence: {p.confidence}</div>
                 </div>
-                <div>
-                  <button onClick={() => sendToAiSdk(p)} className="bg-[#0b7a5b] px-3 py-1 rounded-md text-xs font-semibold hover:bg-[#09664c]">
-                    Send to AI SDK
-                  </button>
-                </div>
               </div>
 
               <div className="mt-2 text-sm text-gray-200">{p.advice}</div>
 
-              <details className="mt-2 text-xs text-gray-400">
-                <summary className="cursor-pointer">View payload</summary>
-                <pre className="text-xs bg-[#070707] p-2 rounded mt-2 overflow-auto">{JSON.stringify({
-                  filename: p.filename,
-                  label: p.label,
-                  confidence: p.confidence,
-                  advice: p.advice
-                }, null, 2)}</pre>
-              </details>
+              {/* BIG button instead of "Send to AI SDK"
+                  - stopPropagation so clicking the button doesn't trigger the outer card onClick twice */}
+              <div className="mt-3">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    getMoreInfo(p);
+                  }}
+                  aria-label={`Get more info about ${p.readable}`}
+                  className="block w-full touch-manipulation bg-[#10a37f] text-white py-3 rounded-xl font-semibold hover:bg-[#0d8b6f] text-center"
+                >
+                  Get More Info
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -354,26 +375,34 @@ export default function App() {
                 {selectedPreviews.map((u, i) => (
                   <div key={i} className="relative group w-20 h-12 rounded-md overflow-hidden border">
                     <img src={u} alt={`sel-${i}`} className="w-full h-full object-cover" />
-                    <button onClick={() => removeSelected(i)}
-                      className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 hidden group-hover:flex items-center justify-center">
+                    <button
+                      onClick={() => removeSelected(i)}
+                      className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 hidden group-hover:flex items-center justify-center"
+                    >
                       <FiX size={10} />
                     </button>
                   </div>
                 ))}
               </div>
 
-              {/* bottom row: plus (left), text input, mic, send (all inside pill) */}
-              <div className="flex items-center gap-3 ">
-                {/* round green + at left side of text input */}
+              {/* bottom row: plus (left), text input, mic, send */}
+              <div className="flex items-center gap-3">
                 <label className="w-30 h-10 flex-shrink-0 rounded-full flex items-center justify-center bg-[#10a37f] text-white cursor-pointer">
                   <div className="flex items-center gap-2">
                     <FiPlus />
                     <p>Add Image</p>
                   </div>
-                  <input ref={fileInputRef} className="hidden" type="file" accept="image/*" multiple onChange={handleFileSelect} disabled={loadingModel || predicting} />
+                  <input
+                    ref={fileInputRef}
+                    className="hidden"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileSelect}
+                    disabled={loadingModel || predicting}
+                  />
                 </label>
 
-                {/* text input */}
                 <input
                   id="messageInput"
                   ref={textRef}
@@ -410,6 +439,81 @@ export default function App() {
           </div>
         </div>
 
+        {/* Modal for Get More Info */}
+        <AnimatePresence>
+          {modalOpen && modalPayload && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center"
+            >
+              {/* overlay */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.6 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setModalOpen(false)}
+                className="absolute inset-0 bg-black"
+              />
+
+              <motion.div
+                initial={{ y: 20, opacity: 0, scale: 0.98 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: 20, opacity: 0, scale: 0.98 }}
+                className="relative bg-[#0f1112] max-w-lg w-full mx-4 rounded-2xl p-4 shadow-lg border border-gray-800 z-10"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-title"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <img src={modalPayload.preview} alt={modalPayload.filename} className="w-20 h-20 rounded-md object-cover border" />
+                    <div>
+                      <h3 id="modal-title" className="text-lg font-semibold">{modalPayload.readable}</h3>
+                      <div className="text-xs text-gray-400">Confidence: {modalPayload.confidence}</div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setModalOpen(false)}
+                    aria-label="Close"
+                    className="p-2 rounded-full hover:bg-gray-800"
+                  >
+                    <FiX />
+                  </button>
+                </div>
+
+                <div className="mt-4 text-sm text-gray-200">{modalPayload.advice}</div>
+
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => {
+                      // copy advice to clipboard
+                      try {
+                        navigator.clipboard.writeText(modalPayload.advice);
+                      } catch {}
+                    }}
+                    className="flex-1 bg-[#10a37f] py-2 rounded-lg text-sm font-semibold hover:bg-[#0d8b6f]"
+                  >
+                    Copy Advice
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      // fallback action: close modal and optionally push a bot message
+                      setModalOpen(false);
+                      pushBotMessage(`💡 Advice saved: ${modalPayload.readable}`);
+                    }}
+                    className="flex-1 bg-gray-800 py-2 rounded-lg text-sm font-semibold hover:bg-gray-700"
+                  >
+                    Save & Close
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
