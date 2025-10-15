@@ -1,0 +1,1 @@
+{"tfjsVersion":"1.7.4","tmVersion":"2.4.10","packageVersion":"0.8.4-alpha2","packageName":"@teachablemachine/image","timeStamp":"2025-10-15T10:05:35.130Z","userMetadata":{},"modelName":"tm-my-image-model","labels":["Cashew-Healthy","Cashew-Diseased","Cassava-Healthy","Cassava-Diseased","Maize-Healthy","Maize-Diseased","Tomato-Healthy","Tomato-Diseased"],"imageSize":224}
