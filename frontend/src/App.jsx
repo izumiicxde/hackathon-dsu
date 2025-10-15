@@ -30,6 +30,10 @@ export default function App() {
   const [loadingModel, setLoadingModel] = useState(true);
   const [predicting, setPredicting] = useState(false);
 
+  // modal state for "Get More Info"
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalPayload, setModalPayload] = useState(null);
+
   const fileInputRef = useRef(null);
   const textRef = useRef(null);
   const scrollRef = useRef(null);
@@ -52,6 +56,15 @@ export default function App() {
     // cleanup preview URLs on unmount
     return () => selectedPreviews.forEach((u) => URL.revokeObjectURL(u));
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // close modal on Esc
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") setModalOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   // smooth autoscroll when messages change
@@ -116,7 +129,7 @@ export default function App() {
     setSelectedPreviews(nextPreviews);
   };
 
-  // predict using fresh object URL per file (avoid revoked URLs)
+  // predict using fresh object URL per file
   const predictImageElement = async (imgEl) => {
     if (!model) throw new Error("Model not ready");
     const t = tf.browser
@@ -143,13 +156,13 @@ export default function App() {
       "Valid leaf detected or uncertain — retake photo from multiple angles.",
   };
 
-  // placeholder for SDK call
-  const sendToAiSdk = async (payload) => {
-    console.log("Send to AI SDK:", payload);
-    pushBotMessage(`✅ Sent ${payload.filename} to AI SDK.`);
+  // Get More Info action -> open modal instead of pushing bot message
+  const getMoreInfo = (payload) => {
+    setModalPayload(payload);
+    setModalOpen(true);
   };
 
-  // handle send/predict: post user bubble, show typing, predict per file using fresh blob URLs
+  // handle send/predict
   const handleSendPredict = async (userText = null) => {
     if (loadingModel || predicting) return;
     if (selectedFiles.length === 0 && !userText) {
@@ -161,24 +174,18 @@ export default function App() {
       ? `${userText} (${selectedFiles.length} image(s))`
       : `Sent ${selectedFiles.length} image(s) for analysis.`;
 
-    // push user message with previews (these previews remain valid for message display)
     pushUserMessage(userMsgText, selectedPreviews);
 
-    // copy arrays for processing
     const filesToProcess = [...selectedFiles];
 
-    // clear UI selections (chat-like)
     setSelectedFiles([]);
     setSelectedPreviews([]);
 
-    // show typing indicator
     pushBotTyping();
     setPredicting(true);
 
     for (let i = 0; i < filesToProcess.length; i++) {
       const file = filesToProcess[i];
-
-      // create a fresh object URL for processing and revoke after use
       const processingUrl = URL.createObjectURL(file);
       const imgEl = new Image();
       imgEl.src = processingUrl;
@@ -190,7 +197,6 @@ export default function App() {
         });
       } catch (err) {
         console.error("Image load error", err);
-        // remove typing and show a bot error for this file
         removeBotTyping();
         pushBotMessage("Failed to load one image for analysis.");
         URL.revokeObjectURL(processingUrl);
@@ -198,7 +204,6 @@ export default function App() {
         return;
       }
 
-      // run prediction
       let pred;
       try {
         pred = await predictImageElement(imgEl);
@@ -211,12 +216,11 @@ export default function App() {
         return;
       }
 
-      // build payload
       const readable = pred.label.replace("_", " ");
       const advice = adviceMap[pred.label] || adviceMap["Unknown"];
       const payload = {
         filename: file.name,
-        preview: processingUrl, // pass the processing url as preview in bot card
+        preview: processingUrl,
         label: pred.label,
         readable,
         confidence: pred.confidence,
@@ -224,7 +228,6 @@ export default function App() {
         raw: pred.raw,
       };
 
-      // push bot card for this image
       setMessages((m) => [
         ...m,
         {
@@ -234,7 +237,12 @@ export default function App() {
         },
       ]);
 
+      // revoke the processing URL AFTER a small delay so the bot card can show the image
+      // (we will keep it for some time; in production upload image and use a real URL)
       setTimeout(() => {
+        // revoke only if the preview isn't part of a user message (we used fresh URL)
+        // safe to revoke; but bot card already references it — to be safe, we won't revoke here.
+        // If needed, implement uploading and use returned URLs. We'll skip revoke to keep bot card image.
         // URL.revokeObjectURL(processingUrl);
       }, 5000);
     }
@@ -310,6 +318,8 @@ export default function App() {
 
     if (msg.type === "botCard") {
       const p = msg.payload;
+
+      // card click opens modal on small screens (and still leaves button available)
       return (
         <motion.div
           layout
@@ -369,7 +379,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex bg-[#0b0b0c] text-white">
+    <div className="min-h-screen flex bg-[#0b0b0c] text-white pb-32">
       {/* Left sidebar */}
       <aside className="w-16 bg-[#0a0a0b] border-r border-gray-900 flex flex-col items-center py-4 gap-4">
         <div className="w-10 h-10 bg-white/10 rounded flex items-center justify-center text-lg">
@@ -430,7 +440,7 @@ export default function App() {
                 ))}
               </div>
 
-              {/* bottom row: plus (left), text input, mic, send (all inside pill) */}
+              {/* bottom row: plus (left), text input, mic, send */}
               <div className="flex items-center gap-3">
                 {/* round green + at left side of text input */}
                 <label className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center bg-[#10a37f] text-white cursor-pointer">
@@ -446,7 +456,6 @@ export default function App() {
                   />
                 </label>
 
-                {/* text input */}
                 <input
                   id="messageInput"
                   ref={textRef}
