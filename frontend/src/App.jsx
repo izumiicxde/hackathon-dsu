@@ -37,6 +37,7 @@ export default function App() {
   const [modalPayload, setModalPayload] = useState(null);
 
   const [isRequestSent, setIsRequestSent] = useState(false);
+  const [agentData, setAgentData] = useState(null);
 
   const fileInputRef = useRef(null);
   const textRef = useRef(null);
@@ -83,6 +84,7 @@ export default function App() {
       );
 
       console.log(res.data);
+      setAgentData(res.data);
     } catch (error) {
       if (axios.isCancel(error)) {
         console.log("Request canceled:", error.message);
@@ -567,6 +569,9 @@ export default function App() {
                         Confidence: {modalPayload.confidence}
                       </div>
                     </div>
+                  </div>
+                  <div className="">
+                    <ReactMarkdown>{JSON.stringify(agentData)}</ReactMarkdown>
                   </div>
 
                   <button
