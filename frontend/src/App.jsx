@@ -376,7 +376,7 @@ export default function App() {
         {/* Chat messages */}
         <main
           ref={scrollRef}
-          className="flex-1 px-4 md:px-6 py-4 overflow-auto flex flex-col gap-4"
+          className="flex-1 px-4 md:px-6 py-4 overflow-auto flex flex-col gap-4 pb-32"
         >
           <AnimatePresence initial={false}>
             {messages.map((m) => (
