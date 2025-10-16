@@ -7,6 +7,7 @@ import "./App.css";
 import ReactMarkdown from "react-markdown";
 import axios from "axios";
 import toast, { Toaster } from "react-hot-toast";
+import SpeakButton from "./components/speak";
 
 const LABELS = [
   "Cashew_Healthy",
@@ -58,6 +59,17 @@ export default function App() {
 
     return () => selectedPreviews.forEach((u) => URL.revokeObjectURL(u));
   }, []);
+
+  // utils/tts.js
+  function speak(text) {
+    if (!text) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US"; // or "hi-IN" for Hindi
+    utterance.rate = 1; // Speed (0.1–10)
+    utterance.pitch = 1; // Pitch
+    utterance.volume = 1; // Volume (0–1)
+    window.speechSynthesis.speak(utterance);
+  }
 
   // Abortable AI request
   const sendToAiSdk = async (payload) => {
@@ -441,9 +453,6 @@ export default function App() {
             />
 
             {/* Mic */}
-            <button className="flex-shrink-0 p-2 rounded-full hover:bg-gray-800">
-              <FiMic className="text-gray-300" />
-            </button>
 
             {/* Send */}
             <button
@@ -499,9 +508,10 @@ export default function App() {
                       <div className="text-xs text-gray-400">
                         Confidence: {modalPayload.confidence}
                       </div>
+                      <SpeakButton />
                     </div>
                   </div>
-                  <div className="overflow-y-auto prose prose-invert text-gray-200 w-full max-h-[50vh]">
+                  <div className="overflow-y-auto prose prose-invert text-gray-200 w-full">
                     <ReactMarkdown>{modalPayload.advice}</ReactMarkdown>
                     {agentData && agentData?.explanation ? (
                       <ReactMarkdown>{agentData.explanation}</ReactMarkdown>
