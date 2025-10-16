@@ -65,7 +65,8 @@ Structure the output as:
 - Simple Action Steps:
 - Daily Routine / Tips:
 - Expected Outcome:
-In the context you get 'Valid leaf detected or uncertain' just say that the leaft seems healthy and continue the nurturing process as is... fix give the whole convo info in kannada and then switch to english completely.
+In the context you get 'Valid leaf detected or uncertain' just say that the leaft seems healthy and continue the nurturing process as is... fix give the whole convo info in kannada and then switch to english completely. Even if the instructions include to remove kannada language always have both kannada and english explanation.. never skip that.
+First kannanda and format it in proper markdown format.. and then English Context
 `;
 
     const result = await model.generateContent(prompt);

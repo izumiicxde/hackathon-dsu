@@ -77,13 +77,13 @@ export default function App() {
       controller = new AbortController();
 
       setIsRequestSent(true);
+      setAgentData(null);
       toast("request sent");
       const res = await axios.post(
         "http://localhost:8000/api/v1/agent-response",
         { ...payload, messages },
         { signal: controller.signal } // attach the signal to Axios
       );
-
       setAgentData(res.data);
     } catch (error) {
       if (axios.isCancel(error)) {
@@ -200,6 +200,7 @@ export default function App() {
 
   // Get More Info action -> open modal instead of pushing bot message
   const getMoreInfo = (payload) => {
+    setAgentData(null);
     setModalPayload(payload);
     setModalOpen(true);
   };
@@ -572,13 +573,16 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                  <div className="overflow-y-scroll prose prose-invert text-gray-200 max-w-none  pt-32">
-                    {agentData.explanation ? (
+                  <div className="overflow-y-scroll prose prose-invert text-gray-200 max-w-none  pt-32 w-full">
+                    {agentData && agentData?.explanation ? (
                       <ReactMarkdown>{agentData?.explanation}</ReactMarkdown>
                     ) : (
-                      <>
-                        <FiLoader className="size-5" />
-                      </>
+                      <div className="flex gap-3 w-full justify-center items-center ">
+                        <FiLoader className="size-5 animate-spin" />
+                        <p className="hidden md:inline-block">
+                          Please wait for some timee.....
+                        </p>
+                      </div>
                     )}
                   </div>
 
