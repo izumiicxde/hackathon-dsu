@@ -6,6 +6,7 @@ import { FiLoader, FiPlus, FiSend, FiX, FiMic } from "react-icons/fi";
 import "./App.css"; // Tailwind + your CSS
 import ReactMarkdown from "react-markdown";
 import axios from "axios";
+import toast, { LoaderIcon, Toaster } from "react-hot-toast";
 
 // Labels must match your model
 const LABELS = [
@@ -76,22 +77,23 @@ export default function App() {
       controller = new AbortController();
 
       setIsRequestSent(true);
-
+      toast("request sent");
       const res = await axios.post(
         "http://localhost:8000/api/v1/agent-response",
         { ...payload, messages },
         { signal: controller.signal } // attach the signal to Axios
       );
 
-      console.log(res.data);
       setAgentData(res.data);
     } catch (error) {
       if (axios.isCancel(error)) {
-        console.log("Request canceled:", error.message);
+        toast("Request canceled", error.message);
       } else if (error.name === "CanceledError") {
-        console.log("Request aborted:", error.message);
+        toast.error("Request aborted:", error.message);
       } else {
-        console.error(error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed.. Please try again"
+        );
       }
     } finally {
       setIsRequestSent(false);
@@ -534,7 +536,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center"
+              className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md"
             >
               {/* overlay */}
               <motion.div
@@ -542,19 +544,19 @@ export default function App() {
                 animate={{ opacity: 0.6 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setModalOpen(false)}
-                className="absolute inset-0 bg-black"
+                className="absolute inset-0 p-20 bg-black h-full backdrop-blur-3xl"
               />
 
               <motion.div
                 initial={{ y: 20, opacity: 0, scale: 0.98 }}
                 animate={{ y: 0, opacity: 1, scale: 1 }}
                 exit={{ y: 20, opacity: 0, scale: 0.98 }}
-                className="relative bg-[#0f1112] max-w-lg w-full mx-4 rounded-2xl p-4 shadow-lg border border-gray-800 z-10"
+                className="relative max-h-[80vh] bg-[#0f1112] max-w-4xl w-full mx-4 rounded-2xl p-4 shadow-lg border border-gray-800 z-10 overflow-auto"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="modal-title"
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-4 ">
                   <div className="flex items-start gap-3">
                     <img
                       src={modalPayload.preview}
@@ -570,12 +572,14 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                  <div className="">
-                    <ReactMarkdown>
-                      {agentData !== null &&
-                        agentData !== "" &&
-                        JSON.stringify(agentData)}
-                    </ReactMarkdown>
+                  <div className="overflow-y-scroll prose prose-invert text-gray-200 max-w-none  pt-32">
+                    {agentData.explanation ? (
+                      <ReactMarkdown>{agentData?.explanation}</ReactMarkdown>
+                    ) : (
+                      <>
+                        <FiLoader className="size-5" />
+                      </>
+                    )}
                   </div>
 
                   <button
@@ -597,7 +601,9 @@ export default function App() {
                       // copy advice to clipboard
                       try {
                         navigator.clipboard.writeText(modalPayload.advice);
-                      } catch {}
+                      } catch (error) {
+                        console.log(error);
+                      }
                     }}
                     className="flex-1 bg-[#10a37f] py-2 rounded-lg text-sm font-semibold hover:bg-[#0d8b6f]"
                   >
@@ -622,6 +628,7 @@ export default function App() {
           )}
         </AnimatePresence>
       </div>
+      <Toaster />
     </div>
   );
 }

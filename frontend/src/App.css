@@ -1,1 +1,9 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@utility prose-pink {
+  @apply prose;
+  & > * {
+    --tw-prose-body: var(--color-pink-800);
+    --tw-prose-headings: var(--color-pink-900);
+  }
+}
